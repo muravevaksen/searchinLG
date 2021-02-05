@@ -1,3 +1,5 @@
+# новости с сайта взяты до 25 января 2021 года
+
 import json
 import nltk
 import pymorphy2
@@ -22,8 +24,8 @@ with open('ParseLysyeGory\output.json') as f:
     for line in f:
         lines = lines + 1
 
-# очень долго обрабатывает все строки, поэтому для тестов взяты 1000 строк вместо всех (lines)
-for i in range(1, 100):
+# очень долго обрабатывает все записи, поэтому для тестов взяты 1000 записей вместо всех (lines)
+for i in range(1, 1000):
     doc = data[i]
     sent = doc["body"]
     sentence = ' '.join(sent)
