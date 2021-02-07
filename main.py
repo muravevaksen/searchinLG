@@ -28,7 +28,7 @@ with open('ParseLysyeGory\output.json') as f:
     for line in f:
         lines = lines + 1
 
-for i in range(1, 100):
+for i in range(1, lines-2):
     doc = data[i]
     sent = doc["body"]
     sentence = ' '.join(sent)
