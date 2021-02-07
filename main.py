@@ -6,13 +6,17 @@ import pymorphy2
 
 from elasticsearch import Elasticsearch
 from nltk.corpus import stopwords
+from wiki_ru_wordnet import WikiWordnet
 
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download("wordnet")
 
 es = Elasticsearch()
+wikiwordnet = WikiWordnet()
 stop_words = stopwords.words("russian")
 morph = pymorphy2.MorphAnalyzer()
+punctuation = [".", ",", "!", "?", ")", "(", ":", ";", "№", "``", "''", "-", " ", "..."]
 
 # считывание файла
 with open('ParseLysyeGory\output.json', 'r', encoding='utf-8') as fh:
@@ -24,72 +28,54 @@ with open('ParseLysyeGory\output.json') as f:
     for line in f:
         lines = lines + 1
 
-# очень долго обрабатывает все записи, поэтому для тестов взяты 1000 записей вместо всех (lines)
-for i in range(1, 1000):
+for i in range(1, 100):
     doc = data[i]
     sent = doc["body"]
     sentence = ' '.join(sent)
+    new_body = ''
 
     tokens = nltk.word_tokenize(sentence) # разделение на токены
 
-    filtered_tokens = []
-    lemmatize = []
-    stemming = []
-    new_body = ''
-    chek_punctuation = True
-
-    # удаление стоп-слов
+    # удаление стоп-слов и знаков препинания, лемматизация
     for token in tokens:
-        if token not in stop_words:
-            filtered_tokens.append(token)
-
-    # лемматизация
-    for token in filtered_tokens:
-        p = morph.parse(token)[0]
-        lemmatize.append(p.normal_form)
-
-    # удаление символов
-    for word in lemmatize:
-        if word != '.' and word != ',' and word != '!' and word != '?' and word != ")" and word != "(" and word != ":"\
-                and word != ';' and word != "№" and word != '``' and word != "''" and word != "-":
-            new_body = new_body + word + " "
-
-    doc = {'body': [new_body],
-           'url': doc['url'],
-           'date': doc['date'],
-           }
+        if (token not in stop_words) and (token not in punctuation):
+            p = morph.parse(token)[0]
+            new_body = new_body + p.normal_form + " "
 
     # создание индекса
-    res = es.index(index='searching', id=i, body=doc)
+    res = es.index(index='searching', id=i, body={'body': [new_body],
+           'url': doc['url'],
+           'date': doc['date'],
+           })
 
 case = int(input("1 - поиск по тексту \n2 - поиск по дате\n"))
 
 if case == 1: # поиск по тексту
     chek = True
     while (chek):
-        filtered_tokens = []
-        lemmatize = []
-        new_data = ""
-        inputdata = input("Введите текст для поиска: ")
+        new_data = []
+        str = ""
 
+        inputdata = input("Введите текст для поиска: ")
         tokens = nltk.word_tokenize(inputdata) # деление на токены
 
-        # удаление стоп-слов
+        # удаление стоп-слов и символов, лемматизация
         for token in tokens:
-            if token not in stop_words:
-                filtered_tokens.append(token)
+            if token not in stop_words and token not in punctuation:
+                p = morph.parse(token)[0]
+                new_data.append(p.normal_form)
 
-        # лемматизация
-        for token in filtered_tokens:
-            p = morph.parse(token)[0]
-            lemmatize.append(p.normal_form)
+        # синонимы
+        for word in new_data:
+            synsets = wikiwordnet.get_synsets(word)
+            if synsets:
+                synset1 = synsets[0]
+                for w in synset1.get_words():
+                    str = str + w.lemma() + " "
+            else:
+                str = str + word + " "
 
-        # удаление символов
-        for word in lemmatize:
-            if word != '.' and word != ',' and word != '!' and word != '?' and word != ")" and word != "(" and word != ":"\
-                    and word != ';' and word != "№" and word != '``' and word != "''" and word != "-":
-                new_data = new_data + word + " "
-        inputdata = new_data
+        inputdata = str
 
         res = es.search(index='searching', body={'query': {'match': {"body": inputdata}}}) # поиск
 
