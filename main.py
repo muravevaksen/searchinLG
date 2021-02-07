@@ -1,8 +1,12 @@
 # новости с сайта взяты до 25 января 2021 года
 
 import json
+import math
+
 import nltk
 import pymorphy2
+
+import numpy as np
 
 from elasticsearch import Elasticsearch
 from nltk.corpus import stopwords
@@ -28,7 +32,7 @@ with open('ParseLysyeGory\output.json') as f:
     for line in f:
         lines = lines + 1
 
-for i in range(1, lines-2):
+for i in range(1, 1000):
     doc = data[i]
     sent = doc["body"]
     sentence = ' '.join(sent)
@@ -52,7 +56,7 @@ case = int(input("1 - поиск по тексту \n2 - поиск по дат�
 
 if case == 1: # поиск по тексту
     chek = True
-    while (chek):
+    while chek:
         new_data = []
         str = ""
 
@@ -80,8 +84,37 @@ if case == 1: # поиск по тексту
         res = es.search(index='searching', body={'query': {'match': {"body": inputdata}}}) # поиск
 
         print('Результаты:')
+        count = 1
         for hit in res['hits']['hits']:
             print(hit['_source']['url'], hit['_score'])
+            count += 1
+
+        # оценка ранжирования
+        grdcase = int(input("Посчитать NDCG метрику? \nда - 1 \nнет - любая другая цифра\n"))
+        doci = np.zeros(count)
+        docreli = np.zeros(count)
+        DCG = np.zeros(count)
+        IDCG = np.zeros(count)
+        sumDCG = 0
+        sumIDCG = 0
+        if grdcase == 1:
+            print("Оцените результаты \n0 - не релевантен \n1 - более менее релевантен \n2 - полностью релевантен\n")
+            for j in range(1, count):
+                doci[j] = j
+                print(j, ' документ:')
+                docreli[j] = int(input())
+                DCG[j] = docreli[j]/math.log(doci[j]+1, 2)
+                sumDCG += DCG[j]
+            print("DCG = ", sumDCG)
+            docreli2 = sorted(docreli)
+            docreli2.reverse()
+            for j in range(1, count):
+                IDCG[j] = docreli2[j-1] / math.log(doci[j] + 1, 2)
+                sumIDCG += IDCG[j]
+            print("IDCG = ", sumIDCG)
+            print("NDCG = ", sumDCG/sumIDCG)
+        else:
+            break
 
 elif case == 2: # поиск по дате
     chek = True
